@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { deliveryOrderService } from '@/modules/delivery-orders/services';
 import { CreateDeliveryOrderFormValues } from '@/modules/delivery-orders/types';
 import { DeliveryOrderForm } from '@/modules/delivery-orders/components/delivery-order-form';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
-export default function NewDeliveryOrderPage() {
+function NewDeliveryOrderContent() {
     const searchParams = useSearchParams();
     const roId = searchParams.get('roId');
     const [initialValues, setInitialValues] = useState<Partial<CreateDeliveryOrderFormValues> | null>(null);
@@ -35,5 +35,13 @@ export default function NewDeliveryOrderPage() {
             </div>
             <DeliveryOrderForm initialValues={initialValues} />
         </div>
+    );
+}
+
+export default function NewDeliveryOrderPage() {
+    return (
+        <Suspense fallback={<div className="p-10 text-center">Loading page...</div>}>
+            <NewDeliveryOrderContent />
+        </Suspense>
     );
 }

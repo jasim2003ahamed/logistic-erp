@@ -79,7 +79,7 @@ export function ReleaseOrderDetail({ id }: ReleaseOrderDetailProps) {
                         )}
                         <div className="grid grid-cols-2 text-sm">
                             <span className="text-slate-500">Customer:</span>
-                            <span className="font-medium">{(ro.invoice as any)?.customer?.name || 'N/A'}</span>
+                            <span className="font-medium">{(ro.invoice as any)?.customer?.company_name || 'N/A'}</span>
                         </div>
                     </CardContent>
                 </Card>

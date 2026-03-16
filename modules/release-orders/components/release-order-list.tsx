@@ -46,7 +46,7 @@ export function ReleaseOrderList() {
                                             {ro.invoice ? `#${ro.invoice.invoice_number}` : '-'}
                                         </td>
                                         <td className="p-4 align-middle">
-                                            {(ro.invoice as any)?.customer?.name || 'Unknown'}
+                                            {(ro.invoice as any)?.customer?.company_name || 'Unknown'}
                                         </td>
                                         <td className="p-4 align-middle capitalize">
                                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${ro.status === 'released' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'

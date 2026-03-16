@@ -45,3 +45,29 @@ export function useCreateQuotation() {
         },
     });
 }
+
+export function useUpdateQuotation() {
+    const queryClient = useQueryClient();
+    const router = useRouter();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string, data: CreateQuotationFormValues }) =>
+            quotationService.updateQuotation(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['quotations'] });
+            queryClient.invalidateQueries({ queryKey: ['quotation'] });
+            router.push('/quotations/list');
+        },
+    });
+}
+
+export function useDeleteQuotation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: string) => quotationService.deleteQuotation(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['quotations'] });
+        },
+    });
+}

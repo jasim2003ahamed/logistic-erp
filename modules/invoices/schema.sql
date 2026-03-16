@@ -10,6 +10,9 @@ create table if not exists invoices (
   total_amount numeric default 0,
   tax_amount numeric default 0,
   subtotal_amount numeric default 0,
+  berth_anchorage text,
+  vessel_delivery_date date,
+  vessel_pod text,
   notes text,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()

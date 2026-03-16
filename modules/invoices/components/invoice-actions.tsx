@@ -11,18 +11,43 @@ import { useRouter } from 'next/navigation';
 
 interface InvoiceActionsProps {
     invoiceId: string;
+    invoiceNumber: string;
     printRef: RefObject<HTMLDivElement | null>;
     status?: string;
 }
 
-export function InvoiceActions({ invoiceId, printRef, status }: InvoiceActionsProps) {
+export function InvoiceActions({ invoiceId, invoiceNumber, printRef, status }: InvoiceActionsProps) {
     const router = useRouter();
     const [updating, setUpdating] = useState(false);
     const [generating, setGenerating] = useState(false);
 
     const handlePrint = useReactToPrint({
         contentRef: printRef,
-        documentTitle: `Invoice-${invoiceId}`,
+        documentTitle: invoiceNumber || `Invoice-${invoiceId}`,
+        pageStyle: `
+            @page {
+                size: A4;
+                margin: 15mm;
+            }
+            @media print {
+                body {
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                    font-family: 'Helvetica', Arial, sans-serif !important;
+                }
+                #invoice-template {
+                    width: 100% !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    box-shadow: none !important;
+                    font-size: 9pt !important;
+                }
+                /* Ensure watermark is visible but subtle */
+                .opacity-\\[0\\.06\\] {
+                    opacity: 0.06 !important;
+                }
+            }
+        `
     });
 
     const markAsPaid = async () => {
@@ -56,21 +81,46 @@ export function InvoiceActions({ invoiceId, printRef, status }: InvoiceActionsPr
         if (!printRef.current) return;
         setGenerating(true);
         try {
-            // @ts-ignore - html2pdf might not have types installed
-            const html2pdf = (await import('html2pdf.js')).default;
+            // Using html2pdf.js for better A4 scaling and reliability
+            const html2pdf = (await import('html2pdf.js' as any)).default;
+            
             const element = printRef.current;
+            
+            // Temporary styles to ensure perfect A4 capture
+            const originalStyle = element.style.cssText;
+            element.style.width = '210mm';
+            element.style.maxWidth = 'none';
+            element.style.height = 'auto';
+            element.style.margin = '0';
+            element.style.padding = '0';
+            element.style.boxShadow = 'none';
+            element.style.backgroundColor = '#ffffff';
+
             const opt = {
                 margin: 0,
-                filename: `Invoice-${invoiceId}.pdf`,
-                image: { type: 'jpeg' as const, quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, logging: false },
-                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' as const }
+                filename: `${invoiceNumber || 'Invoice'}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { 
+                    scale: 2, 
+                    useCORS: true, 
+                    logging: false,
+                    letterRendering: true,
+                    windowWidth: 1200 
+                },
+                jsPDF: { 
+                    unit: 'mm', 
+                    format: 'a4', 
+                    orientation: 'portrait' 
+                }
             };
 
-            await html2pdf().set(opt).from(element).save();
+            await html2pdf().from(element).set(opt).save();
+
+            // Restore original style
+            element.style.cssText = originalStyle;
         } catch (error) {
-            console.error('PDF Generation Error:', error);
-            alert('Failed to generate PDF');
+            console.error('PDF Download Error:', error);
+            alert('PDF generate failed. Please use Print -> Save as PDF as a backup.');
         } finally {
             setGenerating(false);
         }

@@ -2,18 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Package, FileText, LayoutDashboard, ClipboardList, PackageCheck, Truck, CreditCard } from 'lucide-react';
+import { Package, FileText, LayoutDashboard, ClipboardList, PackageCheck, Truck, CreditCard, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Customers', href: '/customers', icon: Users },
+    { name: 'Products', href: '/products', icon: Package },
     { name: 'Quotations', href: '/quotations/list', icon: ClipboardList },
     { name: 'Invoices', href: '/invoices', icon: FileText },
     { name: 'Stock', href: '/stock', icon: Package },
     { name: 'Release Orders', href: '/release-order', icon: PackageCheck },
     { name: 'Delivery Orders', href: '/delivery-order', icon: Truck },
     { name: 'Collections', href: '/collection', icon: CreditCard },
+    { name: 'Collection Notes', href: '/collection-notes', icon: ClipboardList },
 ];
+
 
 export function Navbar() {
     const pathname = usePathname();

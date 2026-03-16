@@ -1,21 +1,9 @@
 import { z } from 'zod';
 
-// --- Database Types (Supabase reflection) ---
-export interface Customer {
-    id: string;
-    name: string;
-    email: string | null;
-    address: string | null;
-    created_at: string;
-}
+import type { Customer } from '../customers/types';
+import type { Product } from '../products/types';
 
-export interface Product {
-    id: string;
-    name: string;
-    sku: string | null;
-    price: number;
-    created_at: string;
-}
+export type { Customer, Product };
 
 export type QuotationStatus = 'draft' | 'sent' | 'approved' | 'rejected';
 
@@ -47,8 +35,8 @@ export interface QuotationItem {
 
 export const quotationItemSchema = z.object({
     product_id: z.string().min(1, "Product is required"),
-    quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
-    unit_price: z.coerce.number().min(0, "Price must be positive"),
+    quantity: z.number().min(1, "Quantity must be at least 1"),
+    unit_price: z.number().min(0, "Price must be positive"),
 });
 
 export const createQuotationSchema = z.object({

@@ -10,12 +10,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createQuotationSchema, CreateQuotationFormValues } from '../types';
-import { useCreateQuotation, useCustomers, useProducts } from '../hooks/useQuotations';
+import { useCreateQuotation, useCustomers, useProducts, useQuotation, useUpdateQuotation } from '../hooks/useQuotations';
 
-export function QuotationForm() {
+interface QuotationFormProps {
+    id?: string;
+}
+
+export function QuotationForm({ id }: QuotationFormProps) {
     const { data: customers } = useCustomers();
     const { data: products } = useProducts();
-    const { mutate: createQuotation, isPending } = useCreateQuotation();
+    const { mutate: createQuotation, isPending: isCreating } = useCreateQuotation();
+    const { mutate: updateQuotation, isPending: isUpdating } = useUpdateQuotation();
+    const { data: existingQuotation, isLoading: isQuotationLoading } = useQuotation(id || '');
 
     const form = useForm<CreateQuotationFormValues>({
         resolver: zodResolver(createQuotationSchema),
@@ -23,6 +29,20 @@ export function QuotationForm() {
             items: [{ product_id: '', quantity: 1, unit_price: 0 }],
         },
     });
+
+    useEffect(() => {
+        if (existingQuotation) {
+            form.reset({
+                customer_id: existingQuotation.customer_id,
+                valid_until: existingQuotation.valid_until || undefined,
+                items: existingQuotation.items?.map(item => ({
+                    product_id: item.product_id,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price
+                })) || []
+            });
+        }
+    }, [existingQuotation, form]);
 
     const { fields, append, remove } = useFieldArray({
         control: form.control,
@@ -52,8 +72,16 @@ export function QuotationForm() {
     }, 0);
 
     const onSubmit = (data: CreateQuotationFormValues) => {
-        createQuotation(data);
+        if (id) {
+            updateQuotation({ id, data });
+        } else {
+            createQuotation(data);
+        }
     };
+
+    if (id && isQuotationLoading) return <div>Loading quotation...</div>;
+
+    const isPending = isCreating || isUpdating;
 
     return (
         <div className="space-y-6">
@@ -63,10 +91,11 @@ export function QuotationForm() {
                         <ArrowLeft className="h-4 w-4" />
                     </Link>
                 </Button>
-                <h1 className="text-3xl font-bold">New Quotation</h1>
+                <h1 className="text-3xl font-bold">{id ? 'Edit Quotation' : 'New Quotation'}</h1>
             </div>
 
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                {/* ... rest of form stays similar ... */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Customer Details</CardTitle>
@@ -82,7 +111,7 @@ export function QuotationForm() {
                                     <option value="">Select a customer...</option>
                                     {customers?.map((c) => (
                                         <option key={c.id} value={c.id}>
-                                            {c.name}
+                                            {c.company_name}
                                         </option>
                                     ))}
                                 </select>
@@ -134,7 +163,7 @@ export function QuotationForm() {
                                     <Input
                                         type="number"
                                         min="1"
-                                        {...form.register(`items.${index}.quantity`)}
+                                        {...form.register(`items.${index}.quantity`, { valueAsNumber: true })}
                                     />
                                 </div>
 
@@ -143,14 +172,14 @@ export function QuotationForm() {
                                     <Input
                                         type="number"
                                         step="0.01"
-                                        {...form.register(`items.${index}.unit_price`)}
+                                        {...form.register(`items.${index}.unit_price`, { valueAsNumber: true })}
                                     />
                                 </div>
 
                                 <div className="w-32 space-y-2">
                                     <label className="text-sm font-medium">Total</label>
                                     <div className="flex h-10 w-full items-center rounded-md border border-slate-100 bg-slate-50 px-3 text-sm text-slate-500">
-                                        {((watchItems[index]?.quantity || 0) * (watchItems[index]?.unit_price || 0)).toFixed(2)}
+                                        {((Number(watchItems[index]?.quantity) || 0) * (Number(watchItems[index]?.unit_price) || 0)).toFixed(2)}
                                     </div>
                                 </div>
 
@@ -180,7 +209,7 @@ export function QuotationForm() {
 
                 <div className="flex justify-end">
                     <Button type="submit" size="lg" disabled={isPending}>
-                        {isPending ? 'Creating...' : 'Create Quotation'}
+                        {isPending ? 'Saving...' : id ? 'Update Quotation' : 'Create Quotation'}
                     </Button>
                 </div>
             </form>

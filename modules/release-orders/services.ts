@@ -9,7 +9,7 @@ export const releaseOrderService = {
             .from('release_orders')
             .select(`
         *,
-        invoice:invoices(invoice_number, customer:customers(name))
+        invoice:invoices(invoice_number, customer:customers(company_name))
       `)
             .order('created_at', { ascending: false });
 

@@ -7,11 +7,17 @@ import { Badge } from '../../../components/ui/badge';
 import { usePendingInvoices } from '../hooks/useCollections';
 import { PendingInvoice } from '../types';
 import { PaymentModal } from './payment-modal';
-import { ReceiptCent } from 'lucide-react';
+import { ReceiptCent, FileText } from 'lucide-react';
+import { CollectionNoteModal } from './collection-note-modal';
 
 export function PendingInvoices() {
     const { data: invoices, isLoading, error } = usePendingInvoices();
     const [selectedInvoice, setSelectedInvoice] = useState<PendingInvoice | null>(null);
+    const [noteInvoice, setNoteInvoice] = useState<PendingInvoice | null>(null);
+
+    const openNoteModal = (inv: PendingInvoice) => {
+        setNoteInvoice(inv);
+    };
 
     if (isLoading) return <div className="p-10 text-center text-slate-500 font-medium">Loading pending invoices...</div>;
     if (error) return <div className="p-10 text-center text-red-500">Error loading invoices.</div>;
@@ -41,7 +47,7 @@ export function PendingInvoices() {
                                 {invoices?.map((inv) => (
                                     <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="p-4 font-medium">#{inv.invoice_number}</td>
-                                        <td className="p-4">{(inv.customer as any)?.name || 'N/A'}</td>
+                                        <td className="p-4">{(inv.customer as any)?.company_name || 'N/A'}</td>
                                         <td className="p-4 text-right">₹ {Number(inv.total_amount).toFixed(2)}</td>
                                         <td className="p-4 text-right">
                                             <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-200">
@@ -49,9 +55,15 @@ export function PendingInvoices() {
                                             </Badge>
                                         </td>
                                         <td className="p-4 text-right">
-                                            <Button size="sm" onClick={() => setSelectedInvoice(inv)}>
-                                                Collect
-                                            </Button>
+                                            <div className="flex gap-2 justify-end">
+                                                <Button size="sm" variant="outline" onClick={() => openNoteModal(inv)}>
+                                                    <FileText className="h-4 w-4 mr-1" />
+                                                    Note
+                                                </Button>
+                                                <Button size="sm" onClick={() => setSelectedInvoice(inv)}>
+                                                    Collect
+                                                </Button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -74,6 +86,16 @@ export function PendingInvoices() {
                     onClose={() => setSelectedInvoice(null)}
                 />
             )}
+
+            {noteInvoice && (
+                <CollectionNoteModal
+                    isOpen={!!noteInvoice}
+                    data={noteInvoice}
+                    type="invoice"
+                    onClose={() => setNoteInvoice(null)}
+                />
+            )}
         </div>
     );
 }
+

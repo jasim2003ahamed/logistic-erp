@@ -11,7 +11,7 @@ export const collectionService = {
             .from('invoices')
             .select(`
         *,
-        customer:customers(name),
+        customer:customers(company_name),
         payments:payments(amount)
       `)
             .neq('status', 'paid')
@@ -40,7 +40,7 @@ export const collectionService = {
             .from('payments')
             .select(`
         *,
-        invoice:invoices(invoice_number, customer:customers(name))
+        invoice:invoices(invoice_number, customer:customers(company_name))
       `)
             .order('payment_date', { ascending: false });
 

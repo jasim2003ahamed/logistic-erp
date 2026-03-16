@@ -1,6 +1,6 @@
 'use client';
 
-import { useFieldArray, useForm } from 'react-hook-form';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -15,8 +15,15 @@ import { createInvoiceSchema, CreateInvoiceFormValues } from '../types';
 import { invoiceService } from '../services';
 import { quotationService } from '@/modules/quotations/services';
 import { Customer, Product } from '@/modules/quotations/types';
+import { LocationSelect } from './location-select';
+import { AIRPORTS } from '../lib/airports';
+import { SEA_PORTS } from '../lib/ports';
 
-export function InvoiceForm() {
+interface InvoiceFormProps {
+    id?: string;
+}
+
+export function InvoiceForm({ id }: InvoiceFormProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const quotationId = searchParams.get('quotationId');
@@ -25,14 +32,16 @@ export function InvoiceForm() {
     const [products, setProducts] = useState<Product[]>([]);
     const [loadingData, setLoadingData] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [nextInvoiceNumber, setNextInvoiceNumber] = useState<string>('');
+    const [nextJobNumber, setNextJobNumber] = useState<string>('');
 
     const form = useForm<CreateInvoiceFormValues>({
         resolver: zodResolver(createInvoiceSchema) as any,
         defaultValues: {
             issue_date: new Date().toISOString().split('T')[0],
             status: 'draft',
-            tax_rate: 18,
-            items: [{ description: '', quantity: 1, unit_price: 0 }],
+            currency: 'SGD',
+            items: [{ description: '', quantity: 1, unit_price: 0, currency: 'SGD' }],
         },
     });
 
@@ -42,10 +51,40 @@ export function InvoiceForm() {
     });
 
     const watchItems = form.watch('items');
+    const serviceModesValue = form.watch('service_modes');
+    const serviceModes = Array.isArray(serviceModesValue) ? serviceModesValue : [];
+    const isShipSpares = serviceModes.some(m => m.toLowerCase().includes('ship spares'));
+    const isAir = serviceModes.some(m => m.toLowerCase().includes('air freight'));
+    const isSea = serviceModes.some(m => m.toLowerCase().includes('sea freight'));
+    
+    // Choose which location list to show based on selected service modes
+    // Prioritize Airports if Air Freight is selected, otherwise default to Sea Ports
+    const locations = isAir ? AIRPORTS : SEA_PORTS;
+
+    const watchTerms = form.watch('terms');
+    const watchIssueDate = form.watch('issue_date');
+
+    // Auto-calculate Due Date based on Terms
+    useEffect(() => {
+        if (!watchTerms || !watchIssueDate) return;
+
+        const daysMatch = watchTerms.match(/(\d+)\s+Days/);
+        if (daysMatch) {
+            const days = parseInt(daysMatch[1]);
+            const date = new Date(watchIssueDate);
+            if (!isNaN(date.getTime())) {
+                date.setDate(date.getDate() + days);
+                form.setValue('due_date', date.toISOString().split('T')[0]);
+            }
+        } else if (watchTerms.includes('COD') || watchTerms.includes('CIA') || watchTerms.includes('PPD')) {
+            // Standard terms usually mean due on issue date or immediate
+            form.setValue('due_date', watchIssueDate);
+        }
+    }, [watchTerms, watchIssueDate, form]);
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [id]); // Reload if ID changes
 
     const loadData = async () => {
         try {
@@ -56,13 +95,85 @@ export function InvoiceForm() {
             setCustomers(customersData as Customer[]);
             setProducts(productsData as Product[]);
 
-            // Check for quotation ID to pre-fill
-            if (quotationId) {
+            if (id) {
+                const existingInvoice = await invoiceService.getInvoiceById(id);
+                if (existingInvoice) {
+                    form.reset({
+                        customer_id: existingInvoice.customer_id,
+                        invoice_number: existingInvoice.invoice_number,
+                        job_number: existingInvoice.job_number || undefined,
+                        quotation_id: existingInvoice.quotation_id || undefined,
+                        parent_invoice_id: existingInvoice.parent_invoice_id || undefined,
+                        issue_date: existingInvoice.issue_date,
+                        due_date: existingInvoice.due_date || undefined,
+                        status: existingInvoice.status,
+                        terms: existingInvoice.terms || undefined,
+                        currency: existingInvoice.currency,
+                        service_modes: existingInvoice.service_modes || [],
+                        shipment_type: existingInvoice.shipment_type || undefined,
+                        hbl_hawb: existingInvoice.hbl_hawb || undefined,
+                        mbl_mawb: existingInvoice.mbl_mawb || undefined,
+                        vessel_flight: existingInvoice.vessel_flight || undefined,
+                        voyage_no: existingInvoice.voyage_no || undefined,
+                        pol: existingInvoice.pol || undefined,
+                        pod: existingInvoice.pod || undefined,
+                        vessel_pod: existingInvoice.vessel_pod || undefined,
+                        delivery_address: existingInvoice.delivery_address || undefined,
+                        etd: existingInvoice.etd || undefined,
+                        eta: existingInvoice.eta || undefined,
+                        commodity: existingInvoice.commodity || undefined,
+                        hs_code: existingInvoice.hs_code || undefined,
+                        num_packages: existingInvoice.num_packages || undefined,
+                        gross_weight: existingInvoice.gross_weight || undefined,
+                        volume: existingInvoice.volume || undefined,
+                        container_type: existingInvoice.container_type || undefined,
+                        temperature: existingInvoice.temperature || undefined,
+                        imo_no: existingInvoice.imo_no || undefined,
+                        berth_anchorage: existingInvoice.berth_anchorage || undefined,
+                        vessel_delivery_date: existingInvoice.vessel_delivery_date || undefined,
+                        notes: existingInvoice.notes || undefined,
+                        items: existingInvoice.items?.map(item => ({
+                            product_id: item.product_id || undefined,
+                            description: item.description,
+                            quantity: item.quantity,
+                            unit_price: item.unit_price,
+                            currency: item.currency || 'SGD'
+                        })) || []
+                    });
+                }
+            } else if (quotationId) {
                 const prefillData = await invoiceService.generateFromQuotation(quotationId);
-                form.reset(prefillData);
+                form.reset({
+                    ...form.getValues(),
+                    ...prefillData,
+                    currency: 'SGD',
+                    service_modes: [],
+                });
+            }
+
+            if (!id) {
+                try {
+                    const [nextInvNum, nextJobNum] = await Promise.all([
+                        invoiceService.generateNextInvoiceNumber(),
+                        invoiceService.generateNextJobNumber(),
+                    ]);
+                    setNextInvoiceNumber(nextInvNum);
+                    setNextJobNumber(nextJobNum);
+                    form.setValue('invoice_number', nextInvNum);
+                    form.setValue('job_number', nextJobNum);
+                } catch (numError) {
+                    console.error("Non-critical: Failed to generate next invoice/job number.", numError);
+                    const fallbackInv = 'DUS-2026-X-DDNN';
+                    const fallbackJob = 'DUS-JB-DDMMYYYYNN';
+                    setNextInvoiceNumber(fallbackInv);
+                    setNextJobNumber(fallbackJob);
+                    form.setValue('invoice_number', fallbackInv);
+                    form.setValue('job_number', fallbackJob);
+                }
             }
         } catch (error) {
-            console.error("Failed to load data", error);
+            console.error("Critical error in loadData:", error);
+            // Optionally set a flag to show a more descriptive error in UI
         } finally {
             setLoadingData(false);
         }
@@ -93,18 +204,18 @@ export function InvoiceForm() {
         return acc + (item.quantity * item.unit_price || 0);
     }, 0);
 
-    const taxRate = form.watch('tax_rate') || 0;
-    const taxAmount = (subtotal * taxRate) / 100;
-    const grandTotal = subtotal + taxAmount;
+    const grandTotal = subtotal;
 
     const onSubmit = async (data: CreateInvoiceFormValues) => {
         setSubmitting(true);
         try {
-            const invoice = await invoiceService.createInvoice(data);
+            const invoice = id
+                ? await invoiceService.updateInvoice(id, data)
+                : await invoiceService.createInvoice(data);
             router.push(`/invoices/${invoice.id}`);
-        } catch (error) {
-            console.error("Failed to create invoice", error);
-            alert("Failed to create invoice");
+        } catch (error: any) {
+            console.error(`Failed to ${id ? 'update' : 'create'} invoice`, error);
+            alert(`Failed to ${id ? 'update' : 'create'} invoice: ${error.message || 'Unknown error'}`);
         } finally {
             setSubmitting(false);
         }
@@ -120,16 +231,16 @@ export function InvoiceForm() {
                         <ArrowLeft className="h-4 w-4" />
                     </Link>
                 </Button>
-                <h1 className="text-3xl font-bold">New Invoice</h1>
+                <h1 className="text-3xl font-bold">{id ? 'Edit Invoice' : 'New Invoice'}</h1>
             </div>
 
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Invoice Details</CardTitle>
+                        <CardTitle>Invoice Header & Terms</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-4 sm:grid-cols-3">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Customer</label>
                                 <select
@@ -139,13 +250,36 @@ export function InvoiceForm() {
                                     <option value="">Select a customer...</option>
                                     {customers.map((c) => (
                                         <option key={c.id} value={c.id}>
-                                            {c.name}
+                                            {c.company_name}
                                         </option>
                                     ))}
                                 </select>
-                                {form.formState.errors.customer_id && (
-                                    <p className="text-sm text-red-500">{form.formState.errors.customer_id.message}</p>
-                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Invoice Number</label>
+                                <Input
+                                    {...form.register('invoice_number')}
+                                    placeholder="DUS-2026-X-DDNN"
+                                    readOnly
+                                    className="bg-slate-50 font-bold"
+                                />
+                                {!id && <p className="text-[10px] text-slate-500 italic">Auto-generated upon save</p>}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Job Number</label>
+                                <Input
+                                    {...form.register('job_number')}
+                                    placeholder="DUS-JB-DDMMYYYYNN"
+                                    className="bg-white font-bold"
+                                />
+                                {!id && <p className="text-[10px] text-slate-500 italic">Auto-generated upon save</p>}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Parent Invoice (Optional)</label>
+                                <Input placeholder="Related Invoice ID" {...form.register('parent_invoice_id')} />
                             </div>
 
                             <div className="space-y-2">
@@ -156,6 +290,29 @@ export function InvoiceForm() {
                                 <label className="text-sm font-medium">Due Date</label>
                                 <Input type="date" {...form.register('due_date')} />
                             </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Payment Terms</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 font-bold text-blue-600"
+                                    {...form.register('terms')}
+                                >
+                                    <option value="">Select Terms...</option>
+                                    <optgroup label="Standard Terms">
+                                        <option value="COD (Cash On Delivery)">COD (Cash On Delivery)</option>
+                                        <option value="CIA (Cash In Advance)">CIA (Cash In Advance)</option>
+                                        <option value="PPD (Prepaid)">PPD (Prepaid)</option>
+                                    </optgroup>
+                                    <optgroup label="Credit Terms">
+                                        <option value="Payment Due in 7 Days">Payment Due in 7 Days</option>
+                                        <option value="Payment Due in 14 Days">Payment Due in 14 Days</option>
+                                        <option value="Payment Due in 30 Days">Payment Due in 30 Days</option>
+                                        <option value="Payment Due in 45 Days">Payment Due in 45 Days</option>
+                                        <option value="Payment Due in 60 Days">Payment Due in 60 Days</option>
+                                        <option value="Payment Due in 90 Days">Payment Due in 90 Days</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Status</label>
                                 <select
@@ -171,13 +328,181 @@ export function InvoiceForm() {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">GST Rate (%)</label>
-                                <Input type="number" {...form.register('tax_rate')} />
+                                <label className="text-sm font-medium">Currency</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"
+                                    {...form.register('currency')}
+                                >
+                                    <option value="SGD">SGD</option>
+                                    <option value="USD">USD</option>
+                                </select>
+                            </div>
+
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Mode of Service</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {[
+                                'Air Freight',
+                                'Sea Freight (FCL / LCL / Reefer / Breakbulk)',
+                                'Road Freight (Local / Cross-Border)',
+                                'Cross Trade Shipment',
+                                'Customs Clearance',
+                                'Warehouse & Distribution',
+                                'Ship Spares in Transit',
+                                'Provisions & Vessel Supplies',
+                                'Cargo Insurance'
+                            ].map((mode) => (
+                                <label key={mode} className="flex items-center space-x-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        value={mode}
+                                        {...form.register('service_modes')}
+                                        className="h-4 w-4 rounded border-gray-300 text-slate-900 focus:ring-slate-900"
+                                    />
+                                    <span>{mode}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Shipment & Vessel Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <div className="space-y-2 lg:col-span-2">
+                                <label className="text-sm font-medium">Shipment Type</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"
+                                    {...form.register('shipment_type')}
+                                >
+                                    <option value="">Select type...</option>
+                                    <option value="Import">Import</option>
+                                    <option value="Export">Export</option>
+                                    <option value="Transshipment">Transshipment</option>
+                                    <option value="Cross Trade">Cross Trade</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">MBL / MAWB No</label>
+                                <Input {...form.register('mbl_mawb')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">HBL / HAWB No</label>
+                                <Input {...form.register('hbl_hawb')} />
+                            </div>
+                            <div className="space-y-2 lg:col-span-2">
+                                <label className="text-sm font-medium">Vessel / Flight Name</label>
+                                <Input {...form.register('vessel_flight')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Voyage No</label>
+                                <Input {...form.register('voyage_no')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">HS Code</label>
+                                <Input {...form.register('hs_code')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{isAir ? 'Airport of Loading' : 'Port of Loading (POL)'}</label>
+                                <Controller
+                                    name="pol"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <LocationSelect 
+                                            value={field.value} 
+                                            onChange={field.onChange} 
+                                            placeholder={isAir ? 'Select loading airport...' : 'Select port of loading...'}
+                                            locations={locations}
+                                        />
+                                    )}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{isAir ? 'Airport of Discharge' : 'Port of Discharge (POD)'}</label>
+                                <Controller
+                                    name="pod"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <LocationSelect 
+                                            value={field.value} 
+                                            onChange={field.onChange} 
+                                            placeholder={isAir ? 'Select discharge airport...' : 'Select port of discharge...'}
+                                            locations={locations}
+                                        />
+                                    )}
+                                />
+                            </div>
+                            <div className="space-y-2 lg:col-span-2">
+                                <label className="text-sm font-medium">Final Delivery Address</label>
+                                <Input {...form.register('delivery_address')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">ETD</label>
+                                <Input type="date" {...form.register('etd')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">ETA</label>
+                                <Input type="date" {...form.register('eta')} />
+                            </div>
+                            <div className="space-y-2 lg:col-span-2">
+                                <label className="text-sm font-medium">Commodity</label>
+                                <Input {...form.register('commodity')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">No. of Packages</label>
+                                <Input {...form.register('num_packages')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Gross Weight (KGS)</label>
+                                <Input {...form.register('gross_weight')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Volume (CBM)</label>
+                                <Input {...form.register('volume')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Container Type</label>
+                                <Input placeholder="20FT / 40HC etc." {...form.register('container_type')} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Temperature (°C)</label>
+                                <Input {...form.register('temperature')} />
                             </div>
                         </div>
-                        <div className="mt-4 space-y-2">
-                            <label className="text-sm font-medium">Notes</label>
-                            <Textarea {...form.register('notes')} placeholder="Payment terms, notes (optional)" />
+
+                        {/* Vessel Supply Details */}
+                        <div className="mt-8 pt-8 border-t">
+                            <h3 className="text-lg font-bold mb-4">Vessel Supply / Ship Spares Details (If Applicable)</h3>
+                            <div className={`grid gap-4 sm:grid-cols-2 ${isShipSpares ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">{isShipSpares ? 'Vessel Name' : 'IMO No'}</label>
+                                    <Input {...form.register('imo_no')} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">{isShipSpares ? 'Port of Loading' : 'Berth / Anchorage'}</label>
+                                    <Input {...form.register('berth_anchorage')} />
+                                </div>
+                                {isShipSpares && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Port of Discharge</label>
+                                        <Input {...form.register('vessel_pod')} placeholder="Type discharge port..." />
+                                    </div>
+                                )}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Delivery Date</label>
+                                    <Input type="date" {...form.register('vessel_delivery_date')} />
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -189,7 +514,7 @@ export function InvoiceForm() {
                             type="button"
                             variant="secondary"
                             size="sm"
-                            onClick={() => append({ description: '', quantity: 1, unit_price: 0 })}
+                            onClick={() => append({ description: '', quantity: 1, unit_price: 0, currency: 'SGD' })}
                         >
                             <Plus className="mr-2 h-4 w-4" /> Add Item
                         </Button>
@@ -237,6 +562,17 @@ export function InvoiceForm() {
                                         />
                                     </div>
 
+                                    <div className="w-24 space-y-2">
+                                        <label className="text-sm font-medium">Currency</label>
+                                        <select
+                                            className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"
+                                            {...form.register(`items.${index}.currency`)}
+                                        >
+                                            <option value="SGD">SGD</option>
+                                            <option value="USD">USD</option>
+                                        </select>
+                                    </div>
+
                                     <div className="w-32 space-y-2">
                                         <label className="text-sm font-medium">Total</label>
                                         <div className="flex h-10 w-full items-center rounded-md border border-slate-100 bg-slate-50 px-3 text-sm text-slate-500">
@@ -260,26 +596,31 @@ export function InvoiceForm() {
                             <p className="text-sm text-red-500">{form.formState.errors.items.message}</p>
                         )}
 
-                        <div className="flex flex-col items-end pt-4 space-y-2">
-                            <div className="text-sm text-slate-500">
-                                Subtotal: ${subtotal.toFixed(2)}
-                            </div>
-                            <div className="text-sm text-slate-500">
-                                tax ({taxRate}%): ${taxAmount.toFixed(2)}
-                            </div>
-                            <div className="text-2xl font-bold">
-                                Grand Total: ${grandTotal.toFixed(2)}
-                            </div>
+                        <div className="text-2xl font-bold">
+                            Total: ${grandTotal.toFixed(2)}
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Notes / Terms</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Textarea
+                            placeholder="All payments subject to agreed terms and conditions."
+                            {...form.register('notes')}
+                            className="min-h-[100px]"
+                        />
                     </CardContent>
                 </Card>
 
                 <div className="flex justify-end">
                     <Button type="submit" size="lg" disabled={submitting}>
-                        {submitting ? 'Saving...' : 'Create Invoice'}
+                        {submitting ? 'Saving...' : id ? 'Update Invoice' : 'Create Invoice'}
                     </Button>
                 </div>
             </form>
-        </div>
+        </div >
     );
 }

@@ -39,7 +39,12 @@ export default function InvoiceDetailPage() {
                         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Invoices
                     </Link>
                 </Button>
-                <InvoiceActions invoiceId={invoice.id} printRef={printRef} status={invoice.status} />
+                <InvoiceActions
+                    invoiceId={invoice.id}
+                    invoiceNumber={invoice.invoice_number as string}
+                    printRef={printRef}
+                    status={invoice.status}
+                />
             </div>
 
             {/* Printable Content */}
