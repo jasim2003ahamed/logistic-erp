@@ -31,6 +31,7 @@ export interface Invoice {
     pod: string | null;
     vessel_pod: string | null;
     delivery_address: string | null;
+    pickup_address: string | null;
     etd: string | null;
     eta: string | null;
     commodity: string | null;
@@ -102,6 +103,7 @@ export const createInvoiceSchema = z.object({
     pod: z.string().optional(),
     vessel_pod: z.string().optional(),
     delivery_address: z.string().optional(),
+    pickup_address: z.string().optional(),
     etd: z.string().optional(),
     eta: z.string().optional(),
     commodity: z.string().optional(),

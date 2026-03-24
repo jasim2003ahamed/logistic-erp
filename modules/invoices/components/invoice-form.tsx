@@ -56,6 +56,7 @@ export function InvoiceForm({ id }: InvoiceFormProps) {
     const isShipSpares = serviceModes.some(m => m.toLowerCase().includes('ship spares'));
     const isAir = serviceModes.some(m => m.toLowerCase().includes('air freight'));
     const isSea = serviceModes.some(m => m.toLowerCase().includes('sea freight'));
+    const isRoad = serviceModes.some(m => m.toLowerCase().includes('road freight'));
     
     // Choose which location list to show based on selected service modes
     // Prioritize Airports if Air Freight is selected, otherwise default to Sea Ports
@@ -119,6 +120,7 @@ export function InvoiceForm({ id }: InvoiceFormProps) {
                         pod: existingInvoice.pod || undefined,
                         vessel_pod: existingInvoice.vessel_pod || undefined,
                         delivery_address: existingInvoice.delivery_address || undefined,
+                        pickup_address: existingInvoice.pickup_address || undefined,
                         etd: existingInvoice.etd || undefined,
                         eta: existingInvoice.eta || undefined,
                         commodity: existingInvoice.commodity || undefined,
@@ -443,8 +445,20 @@ export function InvoiceForm({ id }: InvoiceFormProps) {
                                 />
                             </div>
                             <div className="space-y-2 lg:col-span-2">
+                                <label className="text-sm font-medium">Pickup Address</label>
+                                <Textarea 
+                                    {...form.register('pickup_address')} 
+                                    className={isRoad ? "border-orange-500 ring-orange-500 min-h-[80px]" : "min-h-[80px]"}
+                                    placeholder={isRoad ? "Enter pickup location details..." : ""}
+                                />
+                            </div>
+                            <div className="space-y-2 lg:col-span-2">
                                 <label className="text-sm font-medium">Final Delivery Address</label>
-                                <Input {...form.register('delivery_address')} />
+                                <Textarea 
+                                    {...form.register('delivery_address')} 
+                                    className={isRoad ? "border-orange-500 ring-orange-500 min-h-[80px]" : "min-h-[80px]"}
+                                    placeholder={isRoad ? "Enter target destination details..." : ""}
+                                />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">ETD</label>

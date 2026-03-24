@@ -97,7 +97,7 @@ export function InvoiceTemplate({ invoice }: InvoiceTemplateProps) {
                         <img
                             src="/logo.png"
                             alt="Deal Universal Services Logo"
-                            className="h-14 w-auto mb-1 object-contain"
+                            className="h-24 w-auto mb-2 object-contain"
                         />
                         <div className="text-center">
                             <div className="text-[6.5pt] space-y-0.5 mt-1 text-[#64748b]">
@@ -251,7 +251,7 @@ export function InvoiceTemplate({ invoice }: InvoiceTemplateProps) {
 
                     const logisticsDetails = [
                         { label: 'TRUCK / VEHICLE NO', value: invoice.vessel_flight },
-                        { label: 'COLLECTION ADDRESS', value: invoice.pol },
+                        { label: 'PICKUP ADDRESS', value: invoice.pickup_address },
                         { label: 'DELIVERY ADDRESS', value: invoice.delivery_address },
                         { label: 'DELIVERY DATE', value: invoice.vessel_delivery_date ? formatDate(invoice.vessel_delivery_date) : null },
                     ].filter(d => d.value && d.value !== '-' && d.value !== '');
@@ -358,20 +358,42 @@ export function InvoiceTemplate({ invoice }: InvoiceTemplateProps) {
                                     )}
 
                                     {/* Logistics / Warehouse / Road Section */}
-                                    {showRoad && logisticsDetails.length > 0 && (
+                                    {showRoad && (logisticsDetails.length > 0) && (
                                         <div className="pb-1.5 border-b border-[#f1f5f9] last:border-b-0">
                                             <h4 className="text-[6pt] font-black text-[#64748b] mb-1 uppercase tracking-widest flex items-center gap-1.5">
                                                 <span className="w-1 h-1 rounded-full bg-orange-500"></span>
-                                                Logistics / Road Details
+                                                {isRoad ? 'Road Freight Details' : 'Logistics / Warehouse Details'}
                                             </h4>
-                                            <div className="grid grid-cols-4 gap-x-2 gap-y-1">
-                                                {logisticsDetails.map((detail, idx) => (
-                                                    <div key={idx} className="flex flex-col">
-                                                        <span className="text-[5.5pt] font-black text-[#94a3b8] uppercase tracking-wider">{detail.label}</span>
-                                                        <span className="text-[7pt] font-black text-[#082645] uppercase tabular-nums leading-tight">{detail.value}</span>
+                                            
+                                            {isRoad && (invoice.pickup_address || invoice.delivery_address) ? (
+                                                <div className="grid grid-cols-2 border border-[#082645] mt-1">
+                                                    <div className="border-r border-[#082645]">
+                                                        <div className="bg-[#f8fafc] border-b border-[#082645] py-0.5 px-2 text-center">
+                                                            <span className="text-[6.5pt] font-black text-[#082645] uppercase tracking-widest">PICKUP ADD</span>
+                                                        </div>
+                                                        <div className="p-2 min-h-[40px]">
+                                                            <p className="text-[7.5pt] font-black text-[#082645] whitespace-pre-line uppercase">{invoice.pickup_address || '-'}</p>
+                                                        </div>
                                                     </div>
-                                                ))}
-                                            </div>
+                                                    <div>
+                                                        <div className="bg-[#f8fafc] border-b border-[#082645] py-0.5 px-2 text-center">
+                                                            <span className="text-[6.5pt] font-black text-[#082645] uppercase tracking-widest">DELIVER ADD</span>
+                                                        </div>
+                                                        <div className="p-2 min-h-[40px]">
+                                                            <p className="text-[7.5pt] font-black text-[#082645] whitespace-pre-line uppercase">{invoice.delivery_address || '-'}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-4 gap-x-2 gap-y-1">
+                                                    {logisticsDetails.map((detail, idx) => (
+                                                        <div key={idx} className="flex flex-col">
+                                                            <span className="text-[5.5pt] font-black text-[#94a3b8] uppercase tracking-wider">{detail.label}</span>
+                                                            <span className="text-[7pt] font-black text-[#082645] uppercase tabular-nums leading-tight">{detail.value}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
