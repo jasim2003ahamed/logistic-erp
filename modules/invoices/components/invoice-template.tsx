@@ -215,7 +215,10 @@ export function InvoiceTemplate({ invoice }: InvoiceTemplateProps) {
                 {(() => {
                     const isAir = invoice.service_modes?.includes('Air Freight');
                     const isSea = invoice.service_modes?.some(m => m.includes('Sea Freight') || m.includes('Cross Trade'));
-                    const isRoad = invoice.service_modes?.some(m => m.includes('Road Freight') || m.includes('Warehouse') || m.includes('Customs'));
+                    const isRoad = invoice.service_modes?.some(m => {
+                        const low = m.toLowerCase();
+                        return low.includes('road freight') || low.includes('warehouse') || low.includes('customs');
+                    });
                     const isShipSpares = invoice.service_modes?.some(m => m.includes('Ship Spares') || m.includes('Provisions'));
 
                     const airDetails = [
